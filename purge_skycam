@@ -1,0 +1,243 @@
+#!/bin/csh
+#
+# Syntax
+# purge_skycam skycamt|skycama|skycamz [verbose]
+# oculus also works as a synonym for skycama. They are identical.
+
+set DEBUG = 0
+if ( "$2" == "verbose")  set DEBUG = 1
+
+
+# Set the date format which will be use in logs
+alias datestamp 'date +"%h %d %H:%M:%S"'
+set procname = purge_skycam
+set HOSTNAME = `hostname -s`
+
+
+# Read instrument name from command line
+set instrum = $1
+
+
+# Now set up parameters which vary on an instrument by instrument basis
+switch ($instrum)
+case skycama:
+case oculus:
+  set XFER_LIST    = /icc/tmp/ari_archive_xfer_inst_list
+  set LOGFILE	   = /icc/tmp/purge_log
+  set DATA_PATH	   = /icc/tmp
+  # BACK_PATH is where to send the file for the long term repository backup.
+  # BACK_PATH == DELETE means do not back up. Just send to UK and then delete the onsite original
+  #set BACK_PATH    = /mnt/skycamdata/SkycamA
+  set BACK_PATH    = DELETE
+  set LETTER	   = a
+  set BACK_PREFIX  = A
+  set DELETE_AGE   = 2
+  set FGKV = /usr/local/bin/fits_get_keyword_value_static
+  set FPACK = /usr/local/bin/fpack
+  breaksw
+case skycamt:
+  set XFER_LIST    = /icc/tmp/ari_archive_xfer_inst_list
+  set LOGFILE	   = /icc/tmp/purge_log
+  set DATA_PATH	   = /icc/tmp
+  #set BACK_PATH    = /mnt/skycamdata/SkycamT
+  set BACK_PATH    = DELETE
+  set LETTER	   = t
+  set BACK_PREFIX  = T
+  set DELETE_AGE   = 2
+  set FGKV = /usr/local/bin/fits_get_keyword_value_static
+  set FPACK = /usr/local/bin/fpack
+  breaksw
+case skycamz:
+  set XFER_LIST    = /icc/tmp/ari_archive_xfer_inst_list
+  set LOGFILE	   = /icc/tmp/purge_log
+  set DATA_PATH	   = /icc/tmp
+  #set BACK_PATH    = /mnt/skycamdata/SkycamZ 
+  set BACK_PATH    = DELETE
+  set LETTER	   = z
+  set BACK_PREFIX  = Z
+  set DELETE_AGE   = 2
+  set FGKV = /usr/local/bin/fits_get_keyword_value_static
+  set FPACK = /usr/local/bin/fpack
+  breaksw
+default:
+  echo `datestamp` $HOSTNAME ${procname}: "Unknown instrument $instrum"
+  goto syntax
+endsw
+
+if ($DEBUG) echo `datestamp` $HOSTNAME ${procname}: "Run image purge for $instrum. Looking in $DATA_PATH "
+
+
+if (! -e $LOGFILE) then
+    touch $LOGFILE
+    chmod 666 $LOGFILE
+endif
+
+
+
+# Quick check that there are actually some files to deal with
+echo ${DATA_PATH}/${LETTER}_?_*_0.fits{,.fz} >& /dev/null
+if ($status) then
+  echo `datestamp` $HOSTNAME ${procname}: "Error staus from ls implies there are no files to purge" >>& $LOGFILE
+  if ($DEBUG) echo `datestamp` $HOSTNAME ${procname}: "Error staus from ls implies there are no files to purge" 
+  exit 0 
+endif
+
+foreach file (${DATA_PATH}/${LETTER}_?_*_0.fits{,.fz} ) 
+    echo `datestamp` "$HOSTNAME ${procname}: Found $file " >>& $LOGFILE
+    if ($DEBUG) echo `datestamp` "$HOSTNAME ${procname}: Found $file "
+
+    # If it is an empty file, delete it and move on. This has happened once
+    if (-z $file) then
+	echo `datestamp` "$HOSTNAME ${procname}: Empty $file. Delete" >>& $LOGFILE
+	if ($DEBUG) echo `datestamp` "$HOSTNAME ${procname}: Empty $file. Delete"
+	rm $file
+	continue
+    endif
+  
+    # Each time we perform a test on the data validity we increment ntests.
+    # npass only gets incremented if we pass that test. At the end we can check that npass == ntest before deleting a file
+    set ntest = 0
+    set npass = 0
+
+    if ( "${file:e}" == "fz" ) then
+      set compressed = 1
+      set rfile = ${file:t:r}
+    else if ( "${file:e}" == "fits" ) then
+      set compressed = 0
+      set rfile = ${file:t}
+    else
+      echo "Does not look like a skycam image: $file:t "
+      continue
+    endif
+
+    # 
+    # Make sure the file has been successfully trasfered back to ARI
+    # If not then do not do anything. Just go to next file.
+    #
+    @ ntest ++
+    grep $rfile $XFER_LIST > /dev/null
+    if ($status == 0) then
+      # Incrementing $npass here indicates passing this test
+      @ npass++
+      echo `datestamp` $HOSTNAME ${procname}: $rfile is copied to ari >>& $LOGFILE
+      if ($DEBUG) echo `datestamp` $HOSTNAME ${procname}: $rfile is copied to ari 
+    else
+      echo "$rfile was not transferred to ari" >>& $LOGFILE
+      if ($DEBUG) echo `datestamp` $HOSTNAME ${procname}: "$rfile was not transferred to ari" 
+      continue
+    endif
+
+    # Extract the night-of date and year from the rfile name
+    # We will use these to sort and file the images into neat sub directories
+    set date_yyyymmdd = `echo $rfile | cut -d_ -f3`
+    set date_yyyy = `echo $date_yyyymmdd | cut -c1-4`
+    #set date = `echo ${raw} | gawk -F _ '{print $3}'`
+
+    # Compress the file locally before sending to the destination.
+    # We only want to use fpack if the image is integer so check BITPIX
+    if ($compressed == 0) then
+      set neg_bitpix = `$FGKV ${DATA_PATH}/$rfile BITPIX INT | grep -c - `
+      if ( $neg_bitpix ) then
+        echo "Found a FITS file with floating point BITPIX. This should never happen: ${DATA_PATH}/$rfile "
+        set to_be_backed_up = 0
+        # Abort on this file. Ignore it.
+        continue
+      else
+        $FPACK -D ${DATA_PATH}/$rfile
+      endif
+    endif
+
+    if ("$BACK_PATH" != "DELETE") then
+      # $destination is the final resting place for this file.
+      # It is constructed from the $BACK_PATH, the date of the current file and instrument ID code letters 
+      set destination = ${BACK_PATH}/${date_yyyy}/${BACK_PREFIX}${date_yyyymmdd}
+
+      # Create a data directory if it does not exist
+      if ! (-d $destination ) then
+        if ($DEBUG) echo `datestamp` $HOSTNAME ${procname}: Create $destination  
+        mkdir -p $destination
+        chmod 777 $destination
+      else
+        if ($DEBUG) echo `datestamp` $HOSTNAME ${procname}: Destination $destination already exists
+      endif
+
+      set to_be_backed_up = 1
+
+      # Check if destination file is identical to source file before copying.
+      # We only need to do this because we do not purge files until they are greater than a certain age
+      # and therefore this script may get called several times before the file finally gets purged. I 
+      # don't want to make the backup copy every time.
+      if ( $to_be_backed_up && (-e ${destination}/${rfile}.fz) ) then
+        set master_md5 = ` /usr/bin/md5sum ${DATA_PATH}/${rfile}.fz | awk '{print $1}' `
+        set copy_md5 = ` /usr/bin/md5sum ${destination}/${rfile}.fz | awk '{print $1}' `
+        # Existing backup copy is already OK. Do not recopy it
+        if ( $master_md5 == $copy_md5 ) then
+	  set to_be_backed_up = 0
+          if($DEBUG) echo `datestamp` $HOSTNAME ${procname}: Already a perfect copy there. No need to make another
+        endif
+      endif
+
+      if ( $to_be_backed_up ) then
+        if($DEBUG) echo `datestamp` $HOSTNAME ${procname}: Copying ${rfile}.fz to the backup location 
+        cp ${DATA_PATH}/${rfile}.fz ${destination}/. 
+        chmod 666 ${destination}/${rfile}.fz
+
+        # 
+        # Data integrity check.
+        # Check that the file copied over is byte identical to the source file
+        #
+        @ ntest ++
+        cmp ${DATA_PATH}/${rfile}.fz ${destination}/${rfile}.fz
+        if ($status) then
+          echo `datestamp` $HOSTNAME ${procname}:  "Copy in $BACK_PATH is not same as that in $DATA_PATH " >>& $LOGFILE
+	  if ($DEBUG) echo `datestamp` $HOSTNAME ${procname}:  Copy in $BACK_PATH is not same as that in $DATA_PATH
+        else
+	  echo `datestamp` $HOSTNAME ${procname}:  "Backup and original identical" >>& $LOGFILE
+	  if ($DEBUG) echo `datestamp` $HOSTNAME ${procname}:  "Backup and original identical" 
+	  # Incrementing $npass here indicates passing this test
+	  @ npass++
+        endif
+
+      endif
+
+    endif	# End of if ("$BACK_PATH" != "DELETE")
+
+
+    # 
+    # Data integrity check.
+    # Check data are over a certain age  ($DELETE_AGE days)
+    #
+    # Note use of $file which includes the path instead of $rfile which has the path stripped off
+    @ ntest++
+    set today = `date +%Y%j`
+    set check = `date -r ${DATA_PATH}/${rfile}.fz +%Y%j`
+    @ diff = $today - $check
+    if ($diff >= $DELETE_AGE) then
+      echo `datestamp` $HOSTNAME ${procname}: ${rfile}.fz is older than the specified age. >>& $LOGFILE
+      @ npass++
+    else
+      echo `datestamp` $HOSTNAME ${procname}: ${rfile}.fz is too young to be deleted  >>& $LOGFILE
+      if ($DEBUG) echo `datestamp` $HOSTNAME ${procname}: ${rfile}.fz is too young to be deleted 
+    endif
+
+    # Did we pass all the checks? Is it therefore safe to delete the original data? 
+    if ( $npass == $ntest ) then
+      echo `datestamp` $HOSTNAME ${procname}: $rfile has been fully archived - remove >>& $LOGFILE
+      if ($DEBUG) echo `datestamp` $HOSTNAME ${procname}: $rfile has been fully archived - remove
+
+      /bin/rm -f ${DATA_PATH}/${rfile}.fz 
+    endif
+
+
+
+end
+
+exit 0 
+
+
+
+syntax:
+
+echo "purge_skycam skycamt|skycamz|skycama [verbose] "
+exit 1
+

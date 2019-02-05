@@ -1,0 +1,37 @@
+#!/bin/csh
+# Script to do a 30 second oculus exposure via indiserver library
+# It needs to use the execution directory to write a temporary output file.
+# This is a limitation of the way we simply call the device from command line.
+#
+# IAS 12th June 2014
+#
+# The indiserver we connect to is started on boot in /etc/rc.local as it needs
+# to run as root.
+# The camera USB probably needs to be plugged in on boot therefore.
+
+# This is a demo of the minimum required to take an exposure
+# This script is not used in routine ops. oculus.csh is an extension of this
+# script simply adding control wrappers and extra FITS headers.
+
+# Make sure we are connected to camera
+indi_setprop -p 7264 "SX CCD SuperStar.CONNECTION.CONNECT=On"
+sleep 3
+
+# delete old temporary output file if there is one
+rm -f SX\ CCD\ SuperStar.CCD1.CCD1.fits
+
+#set a 45 second timeout, which all subsequent CCD activity must take place in
+indi_getprop -p 7264 -t 45 &
+
+#take a 30 second exposure
+indi_setprop -p 7264 "SX CCD SuperStar.CCD_EXPOSURE.CCD_EXPOSURE_VALUE=30"
+
+#wait 40 seconds for exposure to complete
+sleep 40
+
+#generate LT style standard filename and rename/move temporary image
+set fname = `/home/eng/bin/filename EXPOSE a /icc/tmp`
+mv SX\ CCD\ SuperStar.CCD1.CCD1.fits $fname
+
+
+ 

@@ -1,0 +1,46 @@
+Required binaries installed in /usr/local/bin
+---------------------------------------------
+
+The camera drivers are provided by a third party repository.
+
+sudo add-apt-repository ppa:mutlaqja/ppa
+sudo apt-get install kstars
+sudo apt-get install indi-full
+sudo apt-get install ntp
+sudo apt-get install ssh
+sudo apt-get install saods9
+sudo apt-get install nfs-common
+
+Edited /etc/rc.local to start server on boot as root:
+	/usr/bin/indiserver -p 7264 /usr/sbin/indi_sx_ccd 
+
+Depending on the base OS, you may need to install procmail RPM/DEB package in
+order to get /usr/bin/lockfile which is used by ari_xfer_inst
+
+---------------------------------------------
+
+fits_get_keyword_value_static		
+fits_add_keyword_value_static		
+fits_add_keyword_value_comment_static		
+
+lmst					Prints current LMST
+					Built from C src in /space/home/dev/src/Time/lmst.c
+
+filename				Binary generates an a_e_yyyymmdd_ etc filename
+					Built from C src found in this directory
+
+ari_xfer_inst				Same transfer script as does all the science data on occ
+					Uses /usr/local/etc/xfer_oculus.cfg. 
+
+purge_skycam				Same as running on on skycamtz and held in the 
+					skycam svn repository
+
+
+Other configs
+-------------
+
+/usr/local/etc/xfer_oculus.cfg		Same transfer script as does all the science data on occ
+
+Create RSA key using ssh-keygen and copy the public key into lt-qc:/home/data/.shh/authorized_keys2
+
+
