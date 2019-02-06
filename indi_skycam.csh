@@ -3,9 +3,6 @@
 # 	Oculus all-sky uses 30sec
 #	skycamT we will try 1x30sec initiall. It may need 3x10sec?
 #
-# It needs to use the execution directory to write a temporary output file.
-# This is a limitation of the way we simply call the device from command line.
-#
 # Original function code that actually takes images: IAS 12th June 2014
 # All the wrappers, locks, xfer, FITS headers etc: RJS 13th June 2014
 #
@@ -323,8 +320,6 @@ $FAKVC $fname CCDXPIXE DOUBLE `$FGKV $fname PIXSIZE1 DOUBLE ` "um" "Physical pix
 $FAKVC $fname CCDYPIXE DOUBLE `$FGKV $fname PIXSIZE2 DOUBLE ` "um" "Physical pixel size"
 # In quicksky, JMM uses keyword DATE in the form YYYY-MM-DD. I can create that from DATE-OBS
 $FAKV $fname DATE STRING `$FGKV $fname DATE-OBS STRING | sed 's/T.*//'`
-
-
 
 
 
