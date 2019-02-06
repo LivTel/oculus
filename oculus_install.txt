@@ -1,39 +1,57 @@
-Required binaries installed in /usr/local/bin
----------------------------------------------
+Required binaries 
+-----------------
 
-The camera drivers are provided by a third party repository.
+On oculus these were all installed in /usr/local/
+On newskycam, many seem to be mixed betwen /usr/ and /home/eng/indi instead
 
-sudo add-apt-repository ppa:mutlaqja/ppa
-sudo apt-get install kstars
-sudo apt-get install indi-full
-sudo apt-get install ntp
-sudo apt-get install ssh
-sudo apt-get install saods9
-sudo apt-get install nfs-common
+On oculus the camera drivers were installed from a third party repository using apt.
+  sudo add-apt-repository ppa:mutlaqja/ppa
+  sudo apt-get install kstars
+  sudo apt-get install indi-full
+On newskycam they were installed by IAS. I am not sure how or where from. Bug 2251 seems to
+suggest indi was already on that machine and we are simply using the existing version. Not
+sure how old that is.
 
+Also need
+  sudo apt-get install ntp
+  sudo apt-get install ssh
+  sudo apt-get install saods9
+  sudo apt-get install nfs-common
+
+On oculus
 Edited /etc/rc.local to start server on boot as root:
 	/usr/bin/indiserver -p 7264 /usr/sbin/indi_sx_ccd 
+On newskycam
+indiserver already started by ics autobooter, so /etc/rc.local not needed.
 
-Depending on the base OS, you may need to install procmail RPM/DEB package in
-order to get /usr/bin/lockfile which is used by ari_xfer_inst
+Previous versions of the data transfer script (ari_xfer_inst) used 'lockfile' which is part of procmail
+but I do not want to install procmail just to get a lockfile handler. Instead the lockfile is
+beind converted to use 'lockfile-create' and 'lockfile-check' which are ubuntu defaults. 
 
----------------------------------------------
+/usr/local/bin/fits_get_keyword_value_static		
+/usr/local/bin/fits_add_keyword_value_static		
+/usr/local/bin/fits_add_keyword_value_comment_static		
 
-fits_get_keyword_value_static		
-fits_add_keyword_value_static		
-fits_add_keyword_value_comment_static		
+-------------------------
 
-lmst					Prints current LMST
-					Built from C src in /space/home/dev/src/Time/lmst.c
+Binaries and scripts included in this directory
 
-filename				Binary generates an a_e_yyyymmdd_ etc filename
-					Built from C src found in this directory
+lmst		Prints current LMST
+		Build from C src and place in /usr/local/bin/.
+			gcc -o lmst lmst.c -lm
+		Version exists in this directory or may be found in ltdevsrv:/space/home/dev/src/Time/lmst.c
 
-ari_xfer_inst				Same transfer script as does all the science data on occ
-					Uses /usr/local/etc/xfer_oculus.cfg. 
+filename	Binary generates an a_e_yyyymmdd_ etc filename
+		Build from C src found in this directory and place in /usr/local/bin/.
+			gcc -o filename filename.c
+		Loads of compile warnings because if a change in the POSIX compliance of the headers, but
+		it builds and works OK.
 
-purge_skycam				Same as running on on skycamtz and held in the 
-					skycam svn repository
+ari_xfer_inst	Same transfer script as does all the science data on occ
+		Uses /usr/local/etc/xfer_oculus.cfg. 
+
+purge_skycam	Same as running on on skycamtz and held in the 
+		skycam svn repository
 
 
 Other configs
