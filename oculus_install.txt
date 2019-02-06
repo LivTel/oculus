@@ -35,6 +35,7 @@ beind converted to use 'lockfile-create' and 'lockfile-check' which are ubuntu d
 -------------------------
 
 Binaries and scripts included in this directory
+Place all in /usr/local/bin/
 
 lmst		Prints current LMST
 		Build from C src and place in /usr/local/bin/.
@@ -47,17 +48,19 @@ filename	Binary generates an a_e_yyyymmdd_ etc filename
 		Loads of compile warnings because if a change in the POSIX compliance of the headers, but
 		it builds and works OK.
 
-ari_xfer_inst	Same transfer script as does all the science data on occ
-		Uses /usr/local/etc/xfer_oculus.cfg. 
+ari_xfer_skycam	Approximately the same transfer script as does all the science data on occ
+		but updated for the skycams.
+		Uses one of the following, depending on which camera
+			/usr/local/etc/xfer_oculus.cfg. 
+			/usr/local/etc/xfer_newskycam.cfg. 
 
-purge_skycam	Same as running on on skycamtz and held in the 
-		skycam svn repository
+purge_skycam	
 
 
 Other configs
 -------------
 
-/usr/local/etc/xfer_oculus.cfg		Same transfer script as does all the science data on occ
+xfer config file shoulod be in /usr/local/etc as described in ari_xfer_skycam above
 
 Create RSA key using ssh-keygen and copy the public key into lt-qc:/home/data/.shh/authorized_keys2
 

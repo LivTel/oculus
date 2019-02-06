@@ -1,4 +1,14 @@
 #!/bin/tcsh
+
+#
+# DEPRECATED
+#
+# indi_skycam.csh is a straight copy of this and then generalised
+# to allow it to be configured for any indiserver camera. That 
+# way we can run the same scripts on oculus and skycamtz. Ultimately
+# indi_skycam.csh will be installed on the oculus machine and this
+# script removed.
+
 # Script to do a 30 second oculus exposure via indiserver library
 # It needs to use the execution directory to write a temporary output file.
 # This is a limitation of the way we simply call the device from command line.
