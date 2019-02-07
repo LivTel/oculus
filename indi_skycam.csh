@@ -91,19 +91,22 @@ if ($DEBUG) echo `datestamp` $hostname ${procname}: "enclosure open" >> $LOGFILE
 indi_setprop -p 7264 "${HARDWARE_NAME}.CONNECTION.CONNECT=On"
 sleep 3
 
-# Set output directory. This should be set in the indiserver defaults.
-# It is not clear we really need to reset it every time
-indi_setprop -p 7264 "${HARDWARE_NAME}.UPLOAD_SETTINGS.UPLOAD_DIR=${datadir}"
-indi_setprop -p 7264 "${HARDWARE_NAME}.UPLOAD_SETTINGS.UPLOAD_PREFIX=${inst_letter}_IMAGE_XX"
-if ($DEBUG) indi_getprop -p 7264 "${HARDWARE_NAME}.UPLOAD_SETTINGS.*" >> $LOGFILE
-
-# delete old temporary output file if there is one
-rm -f "${datadir}/${inst_letter}_IMAGE_"*.fits
-
 # Set a 45 second timeout, which all subsequent CCD activity must take place in
 # According to the docs, it is not clear this is needed
 # Comment out for testing. It may need to be replaced.
-#indi_getprop -p 7264 -t 45 &
+#indi_getprop -p 7264 -t 45 "${HARDWARE_NAME}.CONNECTION.CONNECT" >> /dev/null &
+
+# Set the binning from values in the config file
+indi_setprop -p 7264 "${HARDWARE_NAME}.CCD_BINNING.HOR_BIN=$XBIN;VER_BIN=$YBIN"
+if ($DEBUG) indi_getprop -p 7264 "${HARDWARE_NAME}.CCD_BINNING.*" >> $LOGFILE
+
+# Set output directory. This should be set in the indiserver defaults.
+# It is not clear we really need to reset it every time
+indi_setprop -p 7264 "${HARDWARE_NAME}.UPLOAD_SETTINGS.UPLOAD_DIR=${datadir};UPLOAD_PREFIX=${inst_letter}_IMAGE_XX"
+if ($DEBUG) indi_getprop -p 7264 "${HARDWARE_NAME}.UPLOAD_SETTINGS.*" >> $LOGFILE
+
+# delete old temporary output file if there is one
+rm -f "${datadir}/${inst_letter}_IMAGE_"*.fits >& /dev/null
 
 # Record the LMST now, before the integration. It is not accurately the time the shutter opened
 # but it is close enough for most purposes. 

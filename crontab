@@ -1,17 +1,27 @@
+# This is not intended to be a full crontab that you can install as is.
+# It is a list of examples showing the format. You will need to 
+# configure the crontab on the individual machines as needed. 
 
 # Take exposures once per minute at night
-* 17-23 * * * /usr/local/bin/oculus.csh
-* 00-09 * * * /usr/local/bin/oculus.csh
+# newskycam
+* 17-23 * * * /usr/local/bin/indi_skycam.csh /usr/local/etc/indi_skycam_newskycam.cfg
+* 00-09 * * * /usr/local/bin/indi_skycam.csh /usr/local/etc/indi_skycam_newskycam.cfg
+# oculus
+#* 17-23 * * * /usr/local/bin/indi_skycam.csh /usr/local/etc/indi_skycam_oculus.cfg
+#* 00-09 * * * /usr/local/bin/indi_skycam.csh /usr/local/etc/indi_skycam_oculus.cfg
+
+# Transfer back to ARI.
+# newskycam, single threaded
+* * * * * /usr/local/bin/ari_xfer_skycam /usr/local/etc/xfer_newskycam.cfg 1 
+# oculus with two parallel threads
+#* * * * * /usr/local/bin/ari_xfer_skycam /usr/local/etc/xfer_oculus.cfg 2
+
+# Backup data and purge disk of data that have gone to TQH
+# Identical script to that running on skycamtz
+#0 15 * * * /usr/local/bin/purge_skycam skycama 
 
 # To be tested if exposures at night are actually any use as darks or not
 #00 01 * * * /usr/local/bin/skycam_autodark.csh
-
-# Transfer back to ARI
-* * * * * /usr/local/bin/ari_xfer_inst /usr/local/etc/xfer_oculus.cfg 2
-
-# Backup data and purge disk of data that have gone to TQH
-# Idendical scrip to that running on skycamtz
-0 15 * * * /usr/local/bin/purge_skycam skycama 
 
 # Daily rotate transfer logs when they get too big and truncate the list of transfered files
 #30 14 * * * /usr/sbin/logrotate -s /icc/tmp/logrotate.state /usr/local/etc/logrotate.cfg

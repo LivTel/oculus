@@ -42,7 +42,7 @@ lmst		Prints current LMST
 			gcc -o lmst lmst.c -lm
 		Version exists in this directory or may be found in ltdevsrv:/space/home/dev/src/Time/lmst.c
 
-filename	Binary generates an a_e_yyyymmdd_ etc filename
+filename	Binary generates an [atz]_e_yyyymmdd_ etc filename
 		Build from C src found in this directory and place in /usr/local/bin/.
 			gcc -o filename filename.c
 		Loads of compile warnings because if a change in the POSIX compliance of the headers, but
