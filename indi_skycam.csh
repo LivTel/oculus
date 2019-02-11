@@ -1,10 +1,11 @@
 #!/bin/tcsh
-# Script to do a 30 second exposure via indiserver library
+# Script to do a single $exptime exposure via indiserver library
 # 	Oculus all-sky uses 30sec
-#	skycamT we will try 1x30sec initiall. It may need 3x10sec?
+#	skycamT stil testing. 10sec - 20sec seems about right
 #
 # Original function code that actually takes images: IAS 12th June 2014
 # All the wrappers, locks, xfer, FITS headers etc: RJS 13th June 2014
+# Extended to use per instrument config files, RJS, Feb 2019
 #
 # The indiserver we connect to is started on boot in /etc/rc.local or
 # via the ICS autobooter as it needs to run as root.
@@ -14,6 +15,8 @@
 # 
 # Start up configs
 #
+
+# $EXPTIME is set in the instrument config
 
 alias datestamp 'date +"%h %d %H:%M:%S"'
 set procname = indi_skycam.csh
@@ -113,12 +116,15 @@ rm -f "${datadir}/${inst_letter}_IMAGE_"*.fits >& /dev/null
 set lmst = ` $LMST `
 
 #take a 30 second exposure
-indi_setprop -p 7264 "${HARDWARE_NAME}.CCD_EXPOSURE.CCD_EXPOSURE_VALUE=30"
+indi_setprop -p 7264 "${HARDWARE_NAME}.CCD_EXPOSURE.CCD_EXPOSURE_VALUE=${EXPTIME}"
 
 #wait 40 seconds for exposure to complete
 #indi_getprop -p 7264 "${HARDWARE_NAME}.CCD_EXPOSURE.CCD_EXPOSURE_VALUE"
 #gradually counts down to 0, so we could also watch that instead of just waiting 40sec.
-sleep 40
+#sleep 40
+@ wait_time = $EXPTIME + $OVERHEAD
+if ($DEBUG) echo `datestamp` $hostname ${procname}:  Wait for completion $wait_time sec >> $LOGFILE
+sleep $wait_time
 
 #generate LT style standard filename and rename/move temporary image
 set fname = ` $FILENAME EXPOSE $inst_letter $datadir `
