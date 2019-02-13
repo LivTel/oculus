@@ -18,11 +18,9 @@ Also need
   sudo apt-get install saods9
   sudo apt-get install nfs-common
 
-On oculus
-Edited /etc/rc.local to start server on boot as root:
-	/usr/bin/indiserver -p 7264 /usr/sbin/indi_sx_ccd 
-On newskycam
-indiserver already started by ics autobooter, so /etc/rc.local not needed.
+Edit /etc/rc.local to make root start the server as user eng on boot:
+	echo "indiserver start"
+	su eng -c "/usr/bin/indiserver -p 7264 -l /icc/log/ -vvv /usr/bin/indi_sx_ccd"  1> /icc/log/indiserver_log.txt 2>&1 &
 
 Previous versions of the data transfer script (ari_xfer_inst) used 'lockfile' which is part of procmail
 but I do not want to install procmail just to get a lockfile handler. Instead the lockfile is

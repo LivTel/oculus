@@ -4,6 +4,11 @@
 # purge_skycam skycamt|skycama|skycamz [verbose]
 # oculus also works as a synonym for skycama. They are identical.
 
+# This script is designed make an on-site backup and delete the fits.
+# We have stopped keeping the on-site copy. By setting
+#  set BACK_PATH    = DELETE
+# in the instrument config section, data are just deleted, not backed up on site
+
 set DEBUG = 0
 if ( "$2" == "verbose")  set DEBUG = 1
 
@@ -133,19 +138,6 @@ foreach file (${DATA_PATH}/${LETTER}_?_*_0.fits{,.fz} )
     set date_yyyy = `echo $date_yyyymmdd | cut -c1-4`
     #set date = `echo ${raw} | gawk -F _ '{print $3}'`
 
-    # Compress the file locally before sending to the destination.
-    # We only want to use fpack if the image is integer so check BITPIX
-    if ($compressed == 0) then
-      set neg_bitpix = `$FGKV ${DATA_PATH}/$rfile BITPIX INT | grep -c - `
-      if ( $neg_bitpix ) then
-        echo "Found a FITS file with floating point BITPIX. This should never happen: ${DATA_PATH}/$rfile "
-        set to_be_backed_up = 0
-        # Abort on this file. Ignore it.
-        continue
-      else
-        $FPACK -D ${DATA_PATH}/$rfile
-      endif
-    endif
 
     if ("$BACK_PATH" != "DELETE") then
       # $destination is the final resting place for this file.
@@ -163,13 +155,30 @@ foreach file (${DATA_PATH}/${LETTER}_?_*_0.fits{,.fz} )
 
       set to_be_backed_up = 1
 
+      # Compress the file locally before sending to the destination.
+      # We only want to use fpack if the image is integer so check BITPIX
+      if ($compressed == 0) then
+        set neg_bitpix = `$FGKV ${DATA_PATH}/$rfile BITPIX INT | grep -c - `
+        if ( $neg_bitpix ) then
+          echo "Found a FITS file with floating point BITPIX. This should never happen: ${DATA_PATH}/$rfile "
+          set to_be_backed_up = 0
+          # Abort on this file. Ignore it.
+          continue
+        else
+          $FPACK -D ${DATA_PATH}/$rfile
+        endif
+      endif
+
+      # From now on the name will be ${rfile}.fz
+      set $rfile = ${rfile}.fz
+
       # Check if destination file is identical to source file before copying.
       # We only need to do this because we do not purge files until they are greater than a certain age
       # and therefore this script may get called several times before the file finally gets purged. I 
       # don't want to make the backup copy every time.
-      if ( $to_be_backed_up && (-e ${destination}/${rfile}.fz) ) then
-        set master_md5 = ` /usr/bin/md5sum ${DATA_PATH}/${rfile}.fz | awk '{print $1}' `
-        set copy_md5 = ` /usr/bin/md5sum ${destination}/${rfile}.fz | awk '{print $1}' `
+      if ( $to_be_backed_up && (-e ${destination}/${rfile}) ) then
+        set master_md5 = ` /usr/bin/md5sum ${DATA_PATH}/${rfile} | awk '{print $1}' `
+        set copy_md5 = ` /usr/bin/md5sum ${destination}/${rfile} | awk '{print $1}' `
         # Existing backup copy is already OK. Do not recopy it
         if ( $master_md5 == $copy_md5 ) then
 	  set to_be_backed_up = 0
@@ -178,16 +187,16 @@ foreach file (${DATA_PATH}/${LETTER}_?_*_0.fits{,.fz} )
       endif
 
       if ( $to_be_backed_up ) then
-        if($DEBUG) echo `datestamp` $HOSTNAME ${procname}: Copying ${rfile}.fz to the backup location 
-        cp ${DATA_PATH}/${rfile}.fz ${destination}/. 
-        chmod 666 ${destination}/${rfile}.fz
+        if($DEBUG) echo `datestamp` $HOSTNAME ${procname}: Copying ${rfile} to the backup location 
+        cp ${DATA_PATH}/${rfile} ${destination}/. 
+        chmod 666 ${destination}/${rfile}
 
         # 
         # Data integrity check.
         # Check that the file copied over is byte identical to the source file
         #
         @ ntest ++
-        cmp ${DATA_PATH}/${rfile}.fz ${destination}/${rfile}.fz
+        cmp ${DATA_PATH}/${rfile} ${destination}/${rfile}
         if ($status) then
           echo `datestamp` $HOSTNAME ${procname}:  "Copy in $BACK_PATH is not same as that in $DATA_PATH " >>& $LOGFILE
 	  if ($DEBUG) echo `datestamp` $HOSTNAME ${procname}:  Copy in $BACK_PATH is not same as that in $DATA_PATH
@@ -210,14 +219,14 @@ foreach file (${DATA_PATH}/${LETTER}_?_*_0.fits{,.fz} )
     # Note use of $file which includes the path instead of $rfile which has the path stripped off
     @ ntest++
     set today = `date +%Y%j`
-    set check = `date -r ${DATA_PATH}/${rfile}.fz +%Y%j`
+    set check = `date -r ${DATA_PATH}/${rfile} +%Y%j`
     @ diff = $today - $check
     if ($diff >= $DELETE_AGE) then
-      echo `datestamp` $HOSTNAME ${procname}: ${rfile}.fz is older than the specified age. >>& $LOGFILE
+      echo `datestamp` $HOSTNAME ${procname}: ${rfile} is older than the specified age. >>& $LOGFILE
       @ npass++
     else
-      echo `datestamp` $HOSTNAME ${procname}: ${rfile}.fz is too young to be deleted  >>& $LOGFILE
-      if ($DEBUG) echo `datestamp` $HOSTNAME ${procname}: ${rfile}.fz is too young to be deleted 
+      echo `datestamp` $HOSTNAME ${procname}: ${rfile} is too young to be deleted  >>& $LOGFILE
+      if ($DEBUG) echo `datestamp` $HOSTNAME ${procname}: ${rfile} is too young to be deleted 
     endif
 
     # Did we pass all the checks? Is it therefore safe to delete the original data? 
@@ -225,7 +234,7 @@ foreach file (${DATA_PATH}/${LETTER}_?_*_0.fits{,.fz} )
       echo `datestamp` $HOSTNAME ${procname}: $rfile has been fully archived - remove >>& $LOGFILE
       if ($DEBUG) echo `datestamp` $HOSTNAME ${procname}: $rfile has been fully archived - remove
 
-      /bin/rm -f ${DATA_PATH}/${rfile}.fz 
+      /bin/rm -f ${DATA_PATH}/${rfile} 
     endif
 
 

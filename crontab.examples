@@ -4,11 +4,9 @@
 
 # Take exposures once per minute at night
 # newskycam
-* 17-23 * * * /usr/local/bin/indi_skycam.csh /usr/local/etc/indi_skycam_newskycam.cfg
-* 00-09 * * * /usr/local/bin/indi_skycam.csh /usr/local/etc/indi_skycam_newskycam.cfg
+* 00-09,17-23 * * * /usr/local/bin/indi_skycam.csh /usr/local/etc/indi_skycam_newskycam.cfg
 # oculus
-#* 17-23 * * * /usr/local/bin/indi_skycam.csh /usr/local/etc/indi_skycam_oculus.cfg
-#* 00-09 * * * /usr/local/bin/indi_skycam.csh /usr/local/etc/indi_skycam_oculus.cfg
+#* 00-09,17-23 * * * /usr/local/bin/indi_skycam.csh /usr/local/etc/indi_skycam_oculus.cfg
 
 # Transfer back to ARI.
 # newskycam, single threaded
@@ -18,6 +16,7 @@
 
 # Backup data and purge disk of data that have gone to TQH
 # Identical script to that running on skycamtz
+0 15 * * * /usr/local/bin/purge_skycam skycamt 
 #0 15 * * * /usr/local/bin/purge_skycam skycama 
 
 # To be tested if exposures at night are actually any use as darks or not
