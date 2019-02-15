@@ -1,7 +1,7 @@
 #!/bin/tcsh
 # Script to do a single $exptime exposure via indiserver library
 # 	Oculus all-sky uses 30sec
-#	skycamT stil testing. 10sec - 20sec seems about right
+#	skycamT still testing. 10sec - 30sec seems about right
 #
 # Uses indi config item, UPLOAD_SETTINGS.UPLOAD_DIR. You may need to upgrade the
 # indiserver on oculus before this script can be used. The indiserver originally
@@ -14,13 +14,16 @@
 # The indiserver we connect to is started on boot in /etc/rc.local or
 # via the ICS autobooter as it needs to run as root.
 #
-# The camera USB probably needs to be plugged in on boot therefore.
+# The camera USB needs to be plugged in on boot therefore.
+#
+# No lock files. Quick tests suggest the indiserver is OK. If you start a new exposure
+# while a previous one is underway then the old one is aborted and a new exposure started
+# from scratch. Nothing seems to crash. Overall though you probably want to avoid 
+# calling two instances of this script at the same time.
 
 # 
 # Start up configs
 #
-
-# $EXPTIME is set in the instrument config
 
 alias datestamp 'date +"%h %d %H:%M:%S"'
 set procname = indi_skycam.csh
@@ -28,26 +31,29 @@ set hostname = `hostname -s`
 set LOGFILE = /icc/log/indi_skycam_${hostname}.log
 echo `datestamp` $hostname ${procname}: "Invoking indi_skycam $1 $2" >> $LOGFILE
 
-set CONFIGFILE = "$1"
-if (-e "$CONFIGFILE") then
-  source $CONFIGFILE
-else
-  echo "Syntax: indi_skycam.csh <configfile> [forceinit]"
-  echo "\tconfigfile is fully qualified path to mandatory configuration file"
-  echo "\tOptional flag forceinit reconnects to the indiserver even if already connected"
-  exit 2
-endif
-#DEBUG is set in $CONFIGFILE but can be overridden here
-#set DEBUG = 1
-
+# Parse command line
 set FORCE_INIT = 0
-if ("$2" == "forceinit") then
-  set FORCE_INIT = 1
-  if ($DEBUG) echo `datestamp` $hostname ${procname}: "forceinit has been set" >> $LOGFILE
-else
-  if ($DEBUG) echo `datestamp` $hostname ${procname}: "forceinit not set" >> $LOGFILE
-endif
+set FORCE_DOME = 0
+foreach par ($argv)
+  if ("$par" == "--forceinit") then
+    set FORCE_INIT = 1
+    if ($DEBUG) echo `datestamp` $hostname ${procname}: "forceinit has been set" >> $LOGFILE
+  else if ("$par" == "--forcedome") then
+    set FORCE_DOME = 1
+    if ($DEBUG) echo `datestamp` $hostname ${procname}: "forcedome has been set" >> $LOGFILE
+  else if (-e "$par") then
+     source "$par"
+  else 
+    echo "Syntax: indi_skycam.csh <configfile> [--forceinit] [--forcedome]"
+    echo "\tconfigfile is fully qualified path to mandatory configuration file"
+    echo "\tOptional flag --forceinit reconnects to the indiserver even if already connected."
+    echo "\tOptional flag --forcedome takes exposure even if enclosure is closed."
+    exit 2
+  endif
+end
 
+#DEBUG is set in the config file but can be overridden here
+#set DEBUG = 1
 
 
 # Set explicit paths to all the external helper applications
@@ -96,11 +102,16 @@ rm /tmp/enclosure-open /tmp/enclosure-closed >& /dev/null
 tail -1 /tmp/teldata | grep "OPEN" >! /tmp/enclosure-open
 tail -1 /tmp/teldata | grep "CLOSED" >! /tmp/enclosure-closed
 
-if (!(-z /tmp/enclosure-closed)) then 
-  if ($DEBUG) echo `datestamp` $hostname ${procname}: "enclosure closed" >> $LOGFILE
-  goto ENC_CLOSED
+# Check if either dome is open or the --forcedome option was set
+if ($FORCE_DOME) then
+  if ($DEBUG) echo `datestamp` $hostname ${procname}: "Enclosure ignored by --forcedome option" >> $LOGFILE
+else
+  if (!(-z /tmp/enclosure-closed)) then 
+    if ($DEBUG) echo `datestamp` $hostname ${procname}: "enclosure closed" >> $LOGFILE
+    goto ENC_CLOSED
+  endif
+  if ($DEBUG) echo `datestamp` $hostname ${procname}: "enclosure open" >> $LOGFILE
 endif
-if ($DEBUG) echo `datestamp` $hostname ${procname}: "enclosure open" >> $LOGFILE
 
 
 
@@ -154,17 +165,27 @@ rm -f "${datadir}/${inst_letter}_IMAGE_"*.fits >& /dev/null
 set lmst = ` $LMST `
 #if ($DEBUG) echo `datestamp` $hostname ${procname}:  LMST = $lmst >> $LOGFILE
 
-#take a 30 second exposure
-if ($DEBUG) echo `datestamp` $hostname ${procname}:  Start $EXPTIME sec exposure >> $LOGFILE
-indi_setprop -p 7264 "${HARDWARE_NAME}.CCD_EXPOSURE.CCD_EXPOSURE_VALUE=${EXPTIME}"
+# Take a $MULTRUN x $EXPTIME multrun
+set ct = 0
+while($ct < $MULTRUN)
+  if ($DEBUG) echo `datestamp` $hostname ${procname}:  Start $EXPTIME sec exposure >> $LOGFILE
+  indi_setprop -p 7264 "${HARDWARE_NAME}.CCD_EXPOSURE.CCD_EXPOSURE_VALUE=${EXPTIME}"
+  sleep $OVERHEAD
+  @ ct++
+  while ( `indi_getprop -1 -p 7264 "${HARDWARE_NAME}.CCD_EXPOSURE.CCD_EXPOSURE_VALUE" ` )
+    if ($DEBUG) printf "."  >> $LOGFILE
+    sleep 1
+  end
+  if ($DEBUG) printf "\n"  >> $LOGFILE
+end
 
+#take an $EXPTIME second exposure
+#if ($DEBUG) echo `datestamp` $hostname ${procname}:  Start $EXPTIME sec exposure >> $LOGFILE
+#indi_setprop -p 7264 "${HARDWARE_NAME}.CCD_EXPOSURE.CCD_EXPOSURE_VALUE=${EXPTIME}"
 #wait for exposure to complete
-#indi_getprop -p 7264 "${HARDWARE_NAME}.CCD_EXPOSURE.CCD_EXPOSURE_VALUE"
-#gradually counts down to 0, so we could also watch that instead of just waiting 40sec.
-#sleep 40
-@ wait_time = $EXPTIME + $OVERHEAD
-if ($DEBUG) echo `datestamp` $hostname ${procname}:  Wait for completion $wait_time sec >> $LOGFILE
-sleep $wait_time
+#@ wait_time = $EXPTIME + $OVERHEAD
+#if ($DEBUG) echo `datestamp` $hostname ${procname}:  Wait for completion $wait_time sec >> $LOGFILE
+#sleep $wait_time
 
 # generate LT style standard filename and rename/move temporary image
 # In fact indiserver is capable of doing this itself now. See note in UPLOAD configs above.
@@ -179,7 +200,7 @@ if (! -e ${datadir}/${inst_letter}_IMAGE_01.fits ) then
   echo `datestamp` $hostname ${procname}: " Disconnect from indiserver" >> $LOGFILE
   indi_setprop -p 7264 "${HARDWARE_NAME}.CONNECTION.DISCONNECT=On"
   sleep 3
-  indi_getprop -p 7264 "${HARDWARE_NAME}.CONNECTION.CONNECT=On" >> $LOGFILE
+  indi_getprop -p 7264 "${HARDWARE_NAME}.CONNECTION.CONNECT" >> $LOGFILE
 
   exit 1
 else 
