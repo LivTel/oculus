@@ -160,6 +160,9 @@ endif
 # delete old temporary output file if there is one
 rm -f "${datadir}/${inst_letter}_IMAGE_"*.fits >& /dev/null
 
+# Will get written in FITS header later
+set ccdatemp = `indi_getprop -1 -p 7264 "${HARDWARE_NAME}.CCD_TEMPERATURE.CCD_TEMPERATURE_VALUE"`
+
 # Record the LMST now, before the integration. It is not accurately the time the shutter opened
 # but it is close enough for most purposes. 
 set lmst = ` $LMST `
@@ -242,8 +245,8 @@ else
   # In quicksky, JMM uses keyword DATE in the form YYYY-MM-DD. I can create that from DATE-OBS
   $FAKV $fname DATE STRING `$FGKV $fname DATE-OBS STRING | sed 's/T.*//'`
 
-  # Could also get the CCD temperature from indiserver if you like
-  # SX CCD SXVR-H35.CCD_TEMPERATURE.CCD_TEMPERATURE_VALUE=-20.300000000000000711
+  $FAKV $fname INSTRUME STRING $INSTRUMENT_NAME
+  $FAKVC $fname CCDATEMP DOUBLE $ccdatemp "C" "Detector temperature"
 
   if ($DEBUG) echo `datestamp` $hostname ${procname}: Success. >> $LOGFILE
 endif
