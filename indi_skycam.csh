@@ -15,16 +15,10 @@
 # via the ICS autobooter as it needs to run as root.
 #
 # The camera USB needs to be plugged in on boot therefore.
-#
-# No lock files. Quick tests suggest the indiserver is OK. If you start a new exposure
-# while a previous one is underway then the old one is aborted and a new exposure started
-# from scratch. Nothing seems to crash. Overall though you probably want to avoid 
-# calling two instances of this script at the same time.
 
-# 
+#
 # Start up configs
 #
-
 alias datestamp 'date +"%h %d %H:%M:%S"'
 set procname = indi_skycam.csh
 set hostname = `hostname -s`
@@ -32,6 +26,8 @@ set LOGFILE = /icc/log/indi_skycam_${hostname}.log
 echo `datestamp` $hostname ${procname}: "Invoking indi_skycam $1 $2" >> $LOGFILE
 
 # Parse command line
+if ($#argv == 0) goto syntax
+
 set FORCE_INIT = 0
 set FORCE_DOME = 0
 foreach par ($argv)
@@ -44,11 +40,7 @@ foreach par ($argv)
   else if (-e "$par") then
      source "$par"
   else 
-    echo "Syntax: indi_skycam.csh <configfile> [--forceinit] [--forcedome]"
-    echo "\tconfigfile is fully qualified path to mandatory configuration file"
-    echo "\tOptional flag --forceinit reconnects to the indiserver even if already connected."
-    echo "\tOptional flag --forcedome takes exposure even if enclosure is closed."
-    exit 2
+    goto syntax
   endif
 end
 
@@ -67,6 +59,44 @@ set LMST = ${execdir}/lmst
 set FGKV = ${execdir}/fits_get_keyword_value_static
 set FAKV = ${execdir}/fits_add_keyword_value_static
 set FAKVC = ${execdir}/fits_add_keyword_value_comment_static
+
+set LOCK = /tmp/indi_skycam
+
+
+
+###########
+# Lockfiles
+###########
+if ($DEBUG) echo `datestamp` $hostname ${procname}: Check lockfile >> $LOGFILE
+/usr/bin/lockfile-check $LOCK 
+if ($? == 0) then
+  if ($DEBUG) echo `datestamp` $hostname ${procname}: Lockfile exists >> $LOGFILE
+  set pid = `cat ${LOCK}.lock`
+  set pidfound = `ps -elf | grep $procname | awk '($4=='$pid')' | wc -l`
+  if($pidfound != 0) then
+    if ($DEBUG) echo `datestamp` $hostname ${procname}: "By running ps it looks like exposures are underway. Aborted."
+      echo `datestamp` $hostname ${procname}: "By running ps it looks like exposures are underway. Aborted." >> $LOGFILE
+      exit 1
+    else
+      if ($DEBUG) echo "By running ps it looks like this is an out of date lock file. It has been deleted and exposures will proceed."
+      echo "By running ps it looks like this is an out of date lock file. It has been deleted and exposures will proceed." >> $LOGFILE
+      /usr/bin/lockfile-remove $LOCK
+    endif
+  endif
+endif
+
+# Create lock file
+if ($DEBUG) echo `datestamp` $hostname ${procname}: Create lockfile >> $LOGFILE
+/usr/bin/lockfile-create --use-pid --retry 0 $LOCK
+if ($?) then
+    echo "** Error: Unable to create lockfile: $LOCK " >> $LOGFILE
+    exit 2
+endif
+
+# Now we have a lockfile created, we need to enfore cleanup at the end
+onintr cleanup
+
+if ($DEBUG) echo `datestamp` $hostname ${procname}: Lockfiles complete. Proceed to checking dome >> $LOGFILE
 
 
 
@@ -114,6 +144,9 @@ else
 endif
 
 
+######################
+# CONFIGURE THE CAMERA
+######################
 
 set CONNECT_STATE = `indi_getprop -1 -p 7264 "${HARDWARE_NAME}.CONNECTION.CONNECT"`
 if ( ($FORCE_INIT) || ("$CONNECT_STATE" != "On") ) then
@@ -157,8 +190,18 @@ endif
 # Comment out for testing. It may need to be replaced.
 #indi_getprop -p 7264 -t 45 "${HARDWARE_NAME}.CONNECTION.CONNECT" >> /dev/null &
 
+
+
+#####################################################
+# COLLECT VALUES THAT WILL NEED TO GO INTO THE HEADER
+#####################################################
+
 # delete old temporary output file if there is one
 rm -f "${datadir}/${inst_letter}_IMAGE_"*.fits >& /dev/null
+
+# generate LT style standard filename
+set fname = ` $FILENAME EXPOSE $inst_letter $datadir `
+if ($DEBUG) echo `datestamp` $hostname ${procname}:  File name will be $fname >> $LOGFILE
 
 # Will get written in FITS header later
 set ccdatemp = `indi_getprop -1 -p 7264 "${HARDWARE_NAME}.CCD_TEMPERATURE.CCD_TEMPERATURE_VALUE"`
@@ -167,6 +210,12 @@ set ccdatemp = `indi_getprop -1 -p 7264 "${HARDWARE_NAME}.CCD_TEMPERATURE.CCD_TE
 # but it is close enough for most purposes. 
 set lmst = ` $LMST `
 #if ($DEBUG) echo `datestamp` $hostname ${procname}:  LMST = $lmst >> $LOGFILE
+
+
+
+##################
+# ACTUAL EXPOSURES
+##################
 
 # Take a $MULTRUN x $EXPTIME multrun
 set ct = 0
@@ -182,20 +231,8 @@ while($ct < $MULTRUN)
   if ($DEBUG) printf "\n"  >> $LOGFILE
 end
 
-#take an $EXPTIME second exposure
-#if ($DEBUG) echo `datestamp` $hostname ${procname}:  Start $EXPTIME sec exposure >> $LOGFILE
-#indi_setprop -p 7264 "${HARDWARE_NAME}.CCD_EXPOSURE.CCD_EXPOSURE_VALUE=${EXPTIME}"
-#wait for exposure to complete
-#@ wait_time = $EXPTIME + $OVERHEAD
-#if ($DEBUG) echo `datestamp` $hostname ${procname}:  Wait for completion $wait_time sec >> $LOGFILE
-#sleep $wait_time
 
-# generate LT style standard filename and rename/move temporary image
-# In fact indiserver is capable of doing this itself now. See note in UPLOAD configs above.
-set fname = ` $FILENAME EXPOSE $inst_letter $datadir `
-if ($DEBUG) echo `datestamp` $hostname ${procname}:  File name will be $fname >> $LOGFILE
-
-# Oculus by default creates FITS with the name SX\ CCD\ SuperStar.CCD1.CCD1.fits
+# Check the expected output file exists 
 if (! -e ${datadir}/${inst_letter}_IMAGE_01.fits ) then
   echo `datestamp` $hostname ${procname}: "ERROR : No output image (${datadir}/${inst_letter}_IMAGE_01.fits) from indiserver" >> $LOGFILE
 
@@ -208,9 +245,9 @@ if (! -e ${datadir}/${inst_letter}_IMAGE_01.fits ) then
   exit 1
 else 
 
-  #set latestfile = `ls -1tr ${datadir}/${inst_letter}_IMAGE_*.fits | tail -1`
-  #echo `datestamp` $hostname ${procname}: "Latest CCD image is $latestfile" >> $LOGFILE
-  #cp $latestfile $fname
+  # Rename the indi output file to LT standard filename
+  # In fact indiserver is capable of doing this itself now. See note in UPLOAD configs above.
+
   mv "${datadir}/${inst_letter}_IMAGE_01.fits" $fname
 
   if ($DEBUG) echo `datestamp` $hostname ${procname}: Update all the FITS headers in $fname >> $LOGFILE
@@ -252,12 +289,23 @@ else
 endif
 
 
-
 ######################################
 # What to do if enclosure is closed
-
 ENC_CLOSED:
+#nothing!
+
+# cleanup gets done at the end of any run but we also jump here automatically if
+# the script process gets killed
+cleanup:
+/usr/bin/lockfile-remove $LOCK
 
 if ($DEBUG) echo `datestamp` $hostname ${procname}: Exit script. >> $LOGFILE
 exit 0
- 
+
+syntax:
+    echo `datestamp` $hostname ${procname}: Command line syntax error >> $LOGFILE
+    echo "Syntax: indi_skycam.csh <configfile> [--forceinit] [--forcedome]"
+    echo "\tconfigfile is fully qualified path to mandatory configuration file"
+    echo "\tOptional flag --forceinit reconnects to the indiserver even if already connected."
+    echo "\tOptional flag --forcedome takes exposure even if enclosure is closed."
+    exit 2
