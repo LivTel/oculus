@@ -6,7 +6,7 @@
 # newskycam
 * 00-09,17-23 * * * /usr/local/bin/indi_skycam.csh /usr/local/etc/indi_skycam_newskycam.cfg
 # oculus
-#* 00-09,17-23 * * * /usr/local/bin/indi_skycam.csh /usr/local/etc/indi_skycam_oculus.cfg
+#* 00-09,17-23 * * * /usr/local/bin/indi_skycam.csh /usr/local/etc/indi_skycam_oculus.cfg; /usr/local/bin/get_seb_cloud.csh
 
 # Transfer back to ARI.
 # newskycam, single threaded
