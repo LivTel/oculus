@@ -1,5 +1,11 @@
 #!/bin/tcsh
 
+# There is no strong reason for this to run on the oculus machine. Originally I 
+# expected to run it on ltproxy. You cannot currently run it on ltproxy because of
+# incompatible openssl/TLS versions. Once ltproxy is brought in line with all the
+# other systems, it can optionally be moved there. Running on oculus (since that is
+# the source of the image data) seemed the second more logical place for this script.
+
 # Set the API key, provided by Sebastian
 # Do not check the real API key into github!
 set APIKEY = 1234567890abcdef1234567890abcdef
