@@ -177,6 +177,21 @@ if ( ($FORCE_INIT) || ("$CONNECT_STATE" != "On") ) then
   # Set the binning from values in the config file
   indi_setprop -p 7264 "${HARDWARE_NAME}.CCD_BINNING.HOR_BIN=$XBIN;VER_BIN=$YBIN"
   if ($DEBUG) indi_getprop -p 7264 "${HARDWARE_NAME}.CCD_BINNING.*" >> $LOGFILE
+
+  # The ZWO CCD ASI174MM camera appears to need the GAIN and OFFSET setting.
+  if ( ${?GAIN} ) then
+    indi_setprop -p 7264 "${HARDWARE_NAME}.CCD_CONTROLS.Gain=$GAIN"
+    if ($DEBUG) indi_getprop -p 7264 "${HARDWARE_NAME}.CCD_CONTROLS.Gain" >> $LOGFILE
+  else
+    echo "Not configuring GAIN - it is not set."
+  endif
+  if ( ${?OFFSET} ) then
+    indi_setprop -p 7264 "${HARDWARE_NAME}.CCD_CONTROLS.Offset=$OFFSET"
+    if ($DEBUG) indi_getprop -p 7264 "${HARDWARE_NAME}.CCD_CONTROLS.Offset" >> $LOGFILE
+  else
+    echo "Not configuring OFFSET - it is not set."
+  endif
+  
 else
   if ($DEBUG) then
     echo `datestamp` $hostname ${procname}: "indiserver already connected. Not reconnecting." >> $LOGFILE
