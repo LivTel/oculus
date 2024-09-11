@@ -239,6 +239,7 @@ else
     indi_getprop -p 7264 "${HARDWARE_NAME}.UPLOAD_SETTINGS.*" >> $LOGFILE
     indi_getprop -p 7264 "${HARDWARE_NAME}.CCD_BINNING.*" >> $LOGFILE
     indi_getprop -p 7264 "${HARDWARE_NAME}.CCD_CONTROLS.*" >> $LOGFILE
+    indi_getprop -p 7264 "${HARDWARE_NAME}.FLIP.*" >> $LOGFILE
   endif
 endif
 
