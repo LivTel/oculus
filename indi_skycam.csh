@@ -218,7 +218,21 @@ if ( ($FORCE_INIT) || ("$CONNECT_STATE" != "On") ) then
   else
     echo "Not configuring OFFSET - it is not set."
   endif
-  
+
+  # Image flipping in X/horizontal
+  if ( ${?FLIP_X} ) then
+    indi_setprop -p 7264 "${HARDWARE_NAME}.FLIP.FLIP_HORIZONTAL=$FLIP_X"
+    if ($DEBUG) indi_getprop -p 7264 "${HARDWARE_NAME}.FLIP.FLIP_HORIZONTAL" >> $LOGFILE
+  else
+    echo "Not setting image flipping in X - it is not set."
+  endif
+  # Image flipping in Y/vertical
+  if ( ${?FLIP_Y} ) then
+    indi_setprop -p 7264 "${HARDWARE_NAME}.FLIP.FLIP_VERTICAL=$FLIP_Y"
+    if ($DEBUG) indi_getprop -p 7264 "${HARDWARE_NAME}.FLIP.FLIP_VERTICAL" >> $LOGFILE
+  else
+    echo "Not setting image flipping in Y - it is not set."
+  endif
 else
   if ($DEBUG) then
     echo `datestamp` $hostname ${procname}: "indiserver already connected. Not reconnecting." >> $LOGFILE
