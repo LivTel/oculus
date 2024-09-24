@@ -142,7 +142,7 @@ else
     grep "Object recvd" /tmp/teldata >& /dev/null
     if ($status == 0) break 			# Good. Required data found. Jump out of loop
     if ($DEBUG) echo "/tmp/teldata does not contain the string 'Object recvd'" >> $LOGFILE
-    if ($DEBUG) cat /tmp/teldata >> $LOGFILE
+    #if ($DEBUG) cat /tmp/teldata >> $LOGFILE
     if ($DEBUG) echo `datestamp` $hostname ${procname}: "Retry wget after a 2 sec sleep" >> $LOGFILE
     sleep 2
     @ loopct++
