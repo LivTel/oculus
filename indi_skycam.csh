@@ -184,8 +184,7 @@ if ( ($FORCE_INIT) || ("$CONNECT_STATE" != "On") ) then
   # Set output directory and filename. 
   # On all previous cameras this was "UPLOAD_PREFIX=${inst_letter}_IMAGE_XX". The _XX got automatically replaced with a number by indi.
   # The latest indi for zwo_asi174mm seems to need "UPLOAD_PREFIX=${inst_letter}_IMAGE_XXX". If you put _XX, then it uses a literal "XX" string.
-  # Untested if _XXX is backwards compatible and can be used on the older cameras. If it can then we set _XXX on them all. If not then 
-  # this needs to be moved out into the config file.
+  # Not backwards compatible. If you use _XXX on the older indi then you get a filename _01X.
   indi_setprop -p 7264 "${HARDWARE_NAME}.UPLOAD_SETTINGS.UPLOAD_DIR=${datadir};UPLOAD_PREFIX=${inst_letter}_IMAGE_XXX"
   #
   # On older indi we had to write the file out and then use the "filename" executable to generate
@@ -295,8 +294,17 @@ end
 sleep 1
 
 # Check the expected output file exists 
-if (! -e ${datadir}/${inst_letter}_IMAGE_001.fits ) then
-  echo `datestamp` $hostname ${procname}: "ERROR : No output image (${datadir}/${inst_letter}_IMAGE_001.fits) from indiserver" >> $LOGFILE
+# Depending on the indi version, the default output filename is different, so we have to try both _001 and _01X.
+set file_found = "none"
+foreach fn ( "${datadir}/${inst_letter}_IMAGE_001.fits" "${datadir}/${inst_letter}_IMAGE_01X.fits" ) 
+  if (-e "$fn" ) then
+    set file_found = "$fn"
+    if ($DEBUG) echo "Found output file $file_found" >> $LOGFILE
+  endif
+end
+
+if ( $file_found == "none" ) then
+  echo `datestamp` $hostname ${procname}: "ERROR : No output image from indiserver" >> $LOGFILE
 
   # Disconnect from the server. That will force the script to reconnect and attempt to reinitialise everything next time
   echo `datestamp` $hostname ${procname}: " Disconnect from indiserver" >> $LOGFILE
@@ -304,13 +312,13 @@ if (! -e ${datadir}/${inst_letter}_IMAGE_001.fits ) then
   sleep 3
   indi_getprop -p 7264 "${HARDWARE_NAME}.CONNECTION.CONNECT" >> $LOGFILE
 
-  exit 1
+  goto cleanup 
 else 
 
   # Rename the indi output file to LT standard filename
   # In fact indiserver is capable of doing this itself now. See note in UPLOAD configs above.
-
-  mv "${datadir}/${inst_letter}_IMAGE_001.fits" $fname
+  if ($DEBUG) echo "Moving $file_found to $fname" >> $LOGFILE
+  mv "$file_found" $fname
 
   # Set GAIN and EPERDN keyword values
   # But if $GAINCONFIG is set in the cfg file, save it for reference. Rename the existing GAIN keyword to GAINCONF
