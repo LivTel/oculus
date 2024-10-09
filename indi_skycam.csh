@@ -206,17 +206,18 @@ if ( ($FORCE_INIT) || ("$CONNECT_STATE" != "On") ) then
   if ($DEBUG) indi_getprop -p 7264 "${HARDWARE_NAME}.CCD_BINNING.*" >> $LOGFILE
 
   # The ZWO CCD ASI174MM camera appears to need the GAIN and OFFSET setting.
-  if ( ${?GAIN} ) then
-    indi_setprop -p 7264 "${HARDWARE_NAME}.CCD_CONTROLS.Gain=$GAIN"
+  # Only send these commands if GAINCONFIG and GAINOFFSET are set in the cfg file
+  if ( ${?GAINCONFIG} ) then
+    indi_setprop -p 7264 "${HARDWARE_NAME}.CCD_CONTROLS.Gain=$GAINCONFIG"
     if ($DEBUG) indi_getprop -p 7264 "${HARDWARE_NAME}.CCD_CONTROLS.Gain" >> $LOGFILE
   else
-    echo "Not configuring GAIN - it is not set."
+    echo "Not configuring GAINCONFIG - it is not set in the cfg file."
   endif
-  if ( ${?OFFSET} ) then
-    indi_setprop -p 7264 "${HARDWARE_NAME}.CCD_CONTROLS.Offset=$OFFSET"
+  if ( ${?GAINOFFSET} ) then
+    indi_setprop -p 7264 "${HARDWARE_NAME}.CCD_CONTROLS.Offset=$GAINOFFSET"
     if ($DEBUG) indi_getprop -p 7264 "${HARDWARE_NAME}.CCD_CONTROLS.Offset" >> $LOGFILE
   else
-    echo "Not configuring OFFSET - it is not set."
+    echo "Not configuring OFFSET - it is not set in the cfg file."
   endif
 
   # Image flipping in X/horizontal
@@ -310,6 +311,14 @@ else
   # In fact indiserver is capable of doing this itself now. See note in UPLOAD configs above.
 
   mv "${datadir}/${inst_letter}_IMAGE_001.fits" $fname
+
+  # Set GAIN and EPERDN keyword values
+  # But if $GAINCONFIG is set in the cfg file, save it for reference. Rename the existing GAIN keyword to GAINCONF
+  if ( ${?GAINCONFIG} ) $FAKVC $fname GAINCONF STRING `$FGKV $fname GAIN STRING` "" "Gain mode setting"
+  if ( ${?GAINOFFSET} ) $FAKVC $fname GAINOFFS STRING `$FGKV $fname OFFSET STRING` "" "Gain Offset mode setting"
+  # Now set the numerical gain instead
+  $FAKVC $fname GAIN DOUBLE ${gain_eperdn} "electrons per count" ""
+  $FAKVC $fname EPERDN DOUBLE ${gain_eperdn} "electrons per count" ""
 
   if ($DEBUG) echo `datestamp` $hostname ${procname}: Update all the FITS headers in $fname >> $LOGFILE
   # Add LST to the FITS header. This is LST just before the oculus code was called, not the moment the shutter opened
