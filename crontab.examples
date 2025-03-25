@@ -4,19 +4,19 @@
 
 # Take exposures once per minute at night
 # newskycam
-* 00-09,17-23 * * * /usr/local/bin/indi_skycam.csh /usr/local/etc/indi_skycam_newskycam.cfg
+#* 00-09,17-23 * * * /usr/local/bin/indi_skycam.csh /usr/local/etc/indi_skycam_newskycam.cfg
 # oculus
 #* 00-09,17-23 * * * /usr/local/bin/indi_skycam.csh /usr/local/etc/indi_skycam_oculus.cfg; /usr/local/bin/get_seb_cloud.csh
 
 # Transfer back to ARI.
 # newskycam, single threaded
-* * * * * /usr/local/bin/ari_xfer_skycam /usr/local/etc/xfer_newskycam.cfg 1 
+#* * * * * /usr/local/bin/ari_xfer_skycam /usr/local/etc/xfer_newskycam.cfg 1 
 # oculus with two parallel threads
 #* * * * * /usr/local/bin/ari_xfer_skycam /usr/local/etc/xfer_oculus.cfg 2
 
 # Backup data and purge disk of data that have gone to TQH
 # Identical script to that running on skycamtz
-0 15 * * * /usr/local/bin/purge_skycam skycamt 
+#0 15 * * * /usr/local/bin/purge_skycam skycamt 
 #0 15 * * * /usr/local/bin/purge_skycam skycama 
 
 # To be tested if exposures at night are actually any use as darks or not
@@ -25,4 +25,11 @@
 # Daily rotate transfer logs when they get too big and truncate the list of transfered files
 #30 14 * * * /usr/sbin/logrotate -s /icc/tmp/logrotate.state /usr/local/etc/logrotate.cfg
 
+# SkycamZ
+# Following is the full setup of skycamz as used on sky, March 2025
+# Exposure every minute at night, darks just once at 1am, xfers every minute all day, purge 3pm every afternoon
+* 00-09,17-23 * * * /usr/local/bin/indi_skycam_expose.csh /usr/local/etc/indi_skycamz_zwo_asi174mm.cfg
+00 01 * * * /usr/local/bin/indi_skycam_auto_darks.csh /usr/local/etc/indi_skycamz_zwo_asi174mm.cfg
+* * * * * /usr/local/bin/ari_xfer_skycam /usr/local/etc/xfer_skycamz.cfg 1 
+0 15 * * * /usr/local/bin/purge_skycam skycamz 
 
